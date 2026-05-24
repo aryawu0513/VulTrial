@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+
+# Generated at runtime by run.py — config dirs per (mode, model)
+agentverse/tasks/
+
+# Generated outputs
+datasets/
+results/
+logs/
+
+# Environments
+.env
+.venv/
