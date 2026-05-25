@@ -228,10 +228,9 @@ def parse_verdict(raw_text):
 
 def run_evaluation(args):
     lang = args.language.lower()
-    ds_subdir = "python" if lang == "python" else "c"
-    ds_path = Path(args.dataset_path) / ds_subdir
+    ds_path = Path(args.dataset_path)
     if not ds_path.exists():
-        print(f"Error: dataset subdir not found: {ds_path}", file=sys.stderr)
+        print(f"Error: dataset path not found: {ds_path}", file=sys.stderr)
         sys.exit(1)
 
     # conf name determines the task dir inside VulTrial
