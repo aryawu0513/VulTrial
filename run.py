@@ -357,7 +357,7 @@ def main():
                         help="Where to write result JSON, e.g. VulTrial/results/gpt-4o/npd/C/NPD/dpi")
     parser.add_argument("--variant", required=True,
                         help="Variant name, e.g. findrec")
-    parser.add_argument("--mode", choices=["generic", "npd"], default="generic",
+    parser.add_argument("--mode", choices=["generic", "npd"], default="npd",
                         help="Prompt mode: generic (any vuln) or npd (focus on NPD)")
     parser.add_argument("--model", default="gpt-4o",
                         help="LLM model: gpt-4o or claude-sonnet-4-6")
