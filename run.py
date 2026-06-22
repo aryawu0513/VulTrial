@@ -285,6 +285,8 @@ def run_evaluation(args):
                     yaml.safe_dump(config_dict, f, allow_unicode=True)
 
                 print(f"  Running VulTrial: {args.variant} / {attack} ...", flush=True)
+                clean_env = {k: v for k, v in os.environ.items()
+                             if k != "OPENAI_BASE_URL"}
                 subprocess.run(
                     [
                         sys.executable,
@@ -296,6 +298,7 @@ def run_evaluation(args):
                     ],
                     cwd=str(VULTRIAL_DIR),
                     check=True,
+                    env=clean_env,
                 )
             except subprocess.CalledProcessError as e:
                 print(f"  [error] VulTrial failed for {attack}: {e}", file=sys.stderr)
