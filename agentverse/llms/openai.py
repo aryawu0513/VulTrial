@@ -148,6 +148,8 @@ class OpenAIChatArgs(BaseModelArgs):
 @llm_registry.register("gpt-3.5-turbo")
 @llm_registry.register("gpt-4")
 @llm_registry.register("gpt-4o")
+@llm_registry.register("gpt-4o-mini")
+@llm_registry.register("gpt-5-mini")
 @llm_registry.register("vllm")
 @llm_registry.register("local")
 @llm_registry.register("ft:gpt-4o-2024-08-06:personal:moderator:BAWoJsPO")
@@ -185,6 +187,16 @@ class OpenAIChat(BaseChatModel):
         super().__init__(
             args=args, max_retry=max_retry, client_args=client_args, is_azure=is_azure
         )
+
+    def _api_kwargs(self) -> dict:
+        """Build kwargs for chat.completions.create, using max_completion_tokens
+        instead of max_tokens for newer OpenAI models that require it."""
+        d = self.args.dict()
+        _new_openai = d["model"].startswith(("gpt-5", "o1", "o3", "o4"))
+        if _new_openai:
+            d["max_completion_tokens"] = d.pop("max_tokens")
+            d.pop("temperature", None)  # not supported by reasoning models
+        return d
 
     @classmethod
     def send_token_limit(self, model: str) -> int:
@@ -248,7 +260,7 @@ class OpenAIChat(BaseChatModel):
                 response = openai_client.chat.completions.create(
                     messages=messages,
                     functions=functions,
-                    **self.args.dict(),
+                    **self._api_kwargs(),
                 )
 
                 logger.log_prompt(
@@ -290,7 +302,7 @@ class OpenAIChat(BaseChatModel):
             else:
                 response = openai_client.chat.completions.create(
                     messages=messages,
-                    **self.args.dict(),
+                    **self._api_kwargs(),
                 )
                 logger.log_prompt(
                     [
@@ -347,7 +359,7 @@ class OpenAIChat(BaseChatModel):
                 response = await async_openai_client.chat.completions.create(
                     messages=messages,
                     functions=functions,
-                    **self.args.dict(),
+                    **self._api_kwargs(),
                 )
                 logger.log_prompt(
                     [
@@ -427,7 +439,7 @@ class OpenAIChat(BaseChatModel):
 
                 response = await async_openai_client.chat.completions.create(
                     messages=messages,
-                    **self.args.dict(),
+                    **self._api_kwargs(),
                 )
                 self.collect_metrics(response)
                 logger.log_prompt(
@@ -503,7 +515,7 @@ class OpenAIChat(BaseChatModel):
 
         model = self.args.model
         if model not in input_cost_map or model not in output_cost_map:
-            raise ValueError(f"Model type {model} not supported")
+            return 0.0
 
         return (
             self.total_prompt_tokens * input_cost_map[model] / 1000.0

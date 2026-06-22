@@ -57,7 +57,7 @@ class ConversationAgent(BaseAgent):
         f.write("\n")
         f.close()
         # f.write("***************************************************************************************************\n")
-        
+
         parsed_response = None
         for i in range(self.max_retry):
             try:

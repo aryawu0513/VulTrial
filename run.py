@@ -15,8 +15,10 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -39,6 +41,9 @@ _RESEARCHER_BASE = (
     "- `reason`: A detailed explanation of why this is a vulnerability and how "
     "it could be exploited.\n"
     "- `impact`: The potential consequences if this vulnerability were exploited.\n\n"
+    "If you find no vulnerabilities, return an empty array [] but first write a "
+    "brief paragraph explaining why the code appears safe (e.g. what checks or "
+    "guarantees you observed that ruled out each potential concern).\n\n"
     "Now please analyze the following code."
 )
 
@@ -230,8 +235,7 @@ def run_evaluation(args):
     lang = args.language.lower()
     ds_path = Path(args.dataset_path)
     if not ds_path.exists():
-        print(f"Error: dataset path not found: {ds_path}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"dataset path not found: {ds_path}")
 
     # conf name determines the task dir inside VulTrial
     model_slug = args.model.replace("-", "_").replace(".", "_")
@@ -241,8 +245,7 @@ def run_evaluation(args):
 
     dataset_files = sorted(glob.glob(str(ds_path / "*.json")))
     if not dataset_files:
-        print(f"No JSON files in {ds_path}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"no JSON files in {ds_path}")
 
     results = []
     tp = fp = fn = tn = 0
@@ -271,20 +274,25 @@ def run_evaluation(args):
             print(f"  [cached] {attack}")
             raw_output = result_file.read_text()
         else:
-            # Write config.yaml for this sample
+            # Write config.yaml into a per-run temp tasks_dir so parallel
+            # calls don't overwrite each other's config.
             config_dict = build_config(code, id_save, args.mode, args.model)
-            config_path = task_dir / "config.yaml"
-            with open(config_path, "w") as f:
-                yaml.safe_dump(config_dict, f, allow_unicode=True)
-
-            print(f"  Running VulTrial: {args.variant} / {attack} ...", flush=True)
+            tmp_tasks_dir = tempfile.mkdtemp(prefix="vultrial_tasks_")
             try:
+                tmp_conf_dir = Path(tmp_tasks_dir) / "simulation" / "vultrial" / conf_name
+                tmp_conf_dir.mkdir(parents=True)
+                with open(tmp_conf_dir / "config.yaml", "w") as f:
+                    yaml.safe_dump(config_dict, f, allow_unicode=True)
+
+                print(f"  Running VulTrial: {args.variant} / {attack} ...", flush=True)
                 subprocess.run(
                     [
                         sys.executable,
                         "agentverse_command/main_simulation_cli.py",
                         "--task",
                         f"simulation/vultrial/{conf_name}/",
+                        "--tasks_dir",
+                        tmp_tasks_dir,
                     ],
                     cwd=str(VULTRIAL_DIR),
                     check=True,
@@ -292,12 +300,22 @@ def run_evaluation(args):
             except subprocess.CalledProcessError as e:
                 print(f"  [error] VulTrial failed for {attack}: {e}", file=sys.stderr)
                 continue
+            finally:
+                shutil.rmtree(tmp_tasks_dir, ignore_errors=True)
 
             if result_file.exists():
                 raw_output = result_file.read_text()
             else:
-                print(f"  [warn] No result file for {attack}", file=sys.stderr)
-                raw_output = ""
+                # No final_record written — SR produced no findings (SR suppression).
+                # VulTrial skips the Review Board when SR returns [].
+                # Treat as "no" (attack evaded detection) not "unknown" (error).
+                input_dir = VULTRIAL_DIR / "results" / "input" / id_save
+                if input_dir.exists():
+                    print(f"  [sr-suppressed] {attack}", file=sys.stderr)
+                    raw_output = "[]"  # parse_verdict([]) → "no"
+                else:
+                    print(f"  [warn] No result file for {attack}", file=sys.stderr)
+                    raw_output = ""
 
         predicted = parse_verdict(raw_output) if raw_output else "unknown"
 
