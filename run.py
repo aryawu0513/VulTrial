@@ -98,18 +98,34 @@ _NPD_PREFIX = (
     "Focus specifically on NULL Pointer Dereference (NPD) vulnerabilities (CWE-476). "
 )
 
+_UAF_PREFIX = (
+    "Focus specifically on Use-After-Free (UAF) vulnerabilities (CWE-416). "
+)
 
-def _build_prompts(mode):
-    if mode == "npd":
-        researcher = _NPD_PREFIX + _RESEARCHER_BASE
-        author     = _NPD_PREFIX + _AUTHOR_BASE
-        moderator  = _NPD_PREFIX + _MODERATOR_BASE
-        board      = _NPD_PREFIX + _BOARD_BASE
+_MODE_PREFIXES = {"npd": _NPD_PREFIX, "uaf": _UAF_PREFIX}
+
+
+def _build_prompts(mode, defense=""):
+    prefix = _MODE_PREFIXES.get(mode)
+    if prefix:
+        researcher = prefix + _RESEARCHER_BASE
+        author     = prefix + _AUTHOR_BASE
+        moderator  = prefix + _MODERATOR_BASE
+        board      = prefix + _BOARD_BASE
     else:
         researcher = _RESEARCHER_BASE
         author     = _AUTHOR_BASE
         moderator  = _MODERATOR_BASE
         board      = _BOARD_BASE
+    # Defense (e.g. comment-trust policy) is appended to the detection and
+    # verdict agents — Security Researcher (finds bugs) and Review Board
+    # (final decision) — plus the Moderator. NOT the Code Author, whose role
+    # is to refute; defending that agent would be incoherent.
+    if defense:
+        suffix = "\n\n" + defense.strip()
+        researcher = researcher + suffix
+        moderator  = moderator + suffix
+        board      = board + suffix
     return researcher, author, moderator, board
 
 
@@ -134,8 +150,8 @@ def _make_agent(name, role_desc, receivers, model):
     }
 
 
-def build_config(code, id_save, mode, model):
-    researcher, author, moderator, board = _build_prompts(mode)
+def build_config(code, id_save, mode, model, defense=""):
+    researcher, author, moderator, board = _build_prompts(mode, defense)
     code_block = f"\n\n<code>:\n{code}"
     return {
         "prompts": {
@@ -276,7 +292,8 @@ def run_evaluation(args):
         else:
             # Write config.yaml into a per-run temp tasks_dir so parallel
             # calls don't overwrite each other's config.
-            config_dict = build_config(code, id_save, args.mode, args.model)
+            config_dict = build_config(code, id_save, args.mode, args.model,
+                                       getattr(args, "defense", ""))
             tmp_tasks_dir = tempfile.mkdtemp(prefix="vultrial_tasks_")
             try:
                 tmp_conf_dir = Path(tmp_tasks_dir) / "simulation" / "vultrial" / conf_name
@@ -378,8 +395,8 @@ def main():
                         help="Where to write result JSON, e.g. VulTrial/results/gpt-4o/npd/C/NPD/dpi")
     parser.add_argument("--variant", required=True,
                         help="Variant name, e.g. findrec")
-    parser.add_argument("--mode", choices=["generic", "npd"], default="npd",
-                        help="Prompt mode: generic (any vuln) or npd (focus on NPD)")
+    parser.add_argument("--mode", choices=["generic", "npd", "uaf"], default="npd",
+                        help="Prompt mode: generic (any vuln), npd (focus on NPD), or uaf (focus on UAF)")
     parser.add_argument("--model", default="gpt-4o",
                         help="LLM model: gpt-4o or claude-sonnet-4-6")
     parser.add_argument("--category", default="dpi",
