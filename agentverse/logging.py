@@ -50,12 +50,12 @@ class Logger(metaclass=Singleton):
 
         # Create a handler for console which simulate typing
         self.typing_console_handler = TypingConsoleHandler()
-        self.typing_console_handler.setLevel(logging.INFO)
+        self.typing_console_handler.setLevel(logging.CRITICAL + 1)
         self.typing_console_handler.setFormatter(console_formatter)
 
         # Create a handler for console without typing simulation
         self.console_handler = ConsoleHandler()
-        self.console_handler.setLevel(logging.DEBUG)
+        self.console_handler.setLevel(logging.CRITICAL + 1)
         self.console_handler.setFormatter(console_formatter)
 
         # Info handler in activity.log

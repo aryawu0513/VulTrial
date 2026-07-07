@@ -236,9 +236,9 @@ class OpenAIChat(BaseChatModel):
     ) -> LLMResult:
         messages = self.construct_messages(prepend_prompt, history, append_prompt)
         logger.log_prompt(messages)
-        print("---------------------------------------------")
-        print(messages)
-        print("=============*****====================================")
+        # print("---------------------------------------------")
+        # print(messages)
+        # print("=============*****====================================")
 
         if self.is_azure:
             openai_client = AzureOpenAI(
@@ -254,8 +254,8 @@ class OpenAIChat(BaseChatModel):
         try:
             # Execute function call
             # print(openai_client)
-            print("**************************")
-            print(self.args.dict())
+            # print("**************************")
+            # print(self.args.dict())
             if functions != []:
                 response = openai_client.chat.completions.create(
                     messages=messages,
@@ -339,9 +339,9 @@ class OpenAIChat(BaseChatModel):
     ) -> LLMResult:
         messages = self.construct_messages(prepend_prompt, history, append_prompt)
         logger.log_prompt(messages)
-        print("---------------------------------------------")
-        print(messages)
-        print("=============*****====================================")
+        # print("---------------------------------------------")
+        # print(messages)
+        # print("=============*****====================================")
 
         if self.is_azure:
             async_openai_client = AsyncAzureOpenAI(

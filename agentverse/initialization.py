@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 def load_llm(llm_config: Dict):
     llm_type = llm_config.pop("llm_type", "text-davinci-003")
-    print(llm_type)
+    # print(llm_type)
     return llm_registry.build(llm_type, **llm_config)
 
 
@@ -98,9 +98,9 @@ def prepare_task_config(task, tasks_dir):
         if agent_configs.get("tool_memory", None) is not None:
             agent_configs["tool_memory"] = load_memory(agent_configs["tool_memory"])
         llm = load_llm(agent_configs.get("llm", "text-davinci-003"))
-        print("----------------------")
-        print(llm)
-        print("==========================")
+        # print("----------------------")
+        # print(llm)
+        # print("==========================")
         agent_configs["llm"] = llm
 
         memory_manipulator = load_memory_manipulator(

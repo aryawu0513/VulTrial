@@ -27,10 +27,10 @@ class JudgeOrder(BaseOrder):
         There are 3 cycles * 3 roles = 9 messages. On the 10th message,
         the Jury speaks. No further turns after that.
         """
-        print("**********************")
+        # print("**********************")
 
         turn_number = environment.cnt_turn  # how many messages so far
-        print(turn_number)
+        # print(turn_number)
         # We have 9 turns total (3 cycles * 3 roles) for SecurityResearcher → CodeAuthor → Judge.
         # Then on turn 9 (i.e., the 10th message), the Jury speaks.
 
