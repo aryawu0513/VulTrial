@@ -25,6 +25,13 @@ import yaml
 
 VULTRIAL_DIR = Path(__file__).parent.resolve()
 
+# id_save (the cache key below) is slug+attack+mode+model only — it has no
+# defense component. Seeded-adaptive runs deliberately replay the identical
+# round-0 code across different defenses, so a defense-blind cache silently
+# serves one defense's verdict to all the others. Disabled until the cache
+# key includes the defense text.
+_ENABLE_RESULT_CACHE = False
+
 # ── Agent prompts ──────────────────────────────────────────────────────────────
 
 PROMPT_TEMPLATE = (
@@ -106,6 +113,22 @@ _MODE_PREFIXES = {"npd": _NPD_PREFIX, "uaf": _UAF_PREFIX}
 
 
 def _build_prompts(mode, defense=""):
+    """defense: either a plain string (applied identically to all four
+    defended roles, the original behavior) or a dict with any of the keys
+    "security_researcher"/"code_author"/"moderator"/"review_board" mapping to
+    that role's OWN defense text (e.g. a per-role D5 Prior Analysis anchor
+    built from that same role's own prior output, not a different role's
+    verdict).
+
+    Code Author IS defended (unlike the original design here, which excluded
+    it as "incoherent since its job is to refute"). That reasoning missed
+    that Code Author is exactly the agent that launders a fabricated comment
+    claim into a confident, structured legal-style refutation — by the time
+    it reaches the (defended) Review Board, the raw comment has already been
+    repackaged as "argument," not "an untrusted comment." Leaving Code Author
+    undefended means the strongest voice for the attacker's claim is the one
+    agent with no skepticism instruction at all. Defending it doesn't stop it
+    from refuting — it stops it from refuting USING unverifiable claims."""
     prefix = _MODE_PREFIXES.get(mode)
     if prefix:
         researcher = prefix + _RESEARCHER_BASE
@@ -117,15 +140,21 @@ def _build_prompts(mode, defense=""):
         author     = _AUTHOR_BASE
         moderator  = _MODERATOR_BASE
         board      = _BOARD_BASE
-    # Defense (e.g. comment-trust policy) is appended to the detection and
-    # verdict agents — Security Researcher (finds bugs) and Review Board
-    # (final decision) — plus the Moderator. NOT the Code Author, whose role
-    # is to refute; defending that agent would be incoherent.
-    if defense:
-        suffix = "\n\n" + defense.strip()
-        researcher = researcher + suffix
-        moderator  = moderator + suffix
-        board      = board + suffix
+    if isinstance(defense, dict):
+        per_role = defense
+    elif defense:
+        per_role = {"security_researcher": defense, "code_author": defense,
+                    "moderator": defense, "review_board": defense}
+    else:
+        per_role = {}
+    if per_role.get("security_researcher"):
+        researcher = researcher + "\n\n" + per_role["security_researcher"].strip()
+    if per_role.get("code_author"):
+        author = author + "\n\n" + per_role["code_author"].strip()
+    if per_role.get("moderator"):
+        moderator = moderator + "\n\n" + per_role["moderator"].strip()
+    if per_role.get("review_board"):
+        board = board + "\n\n" + per_role["review_board"].strip()
     return researcher, author, moderator, board
 
 
@@ -294,7 +323,7 @@ def run_evaluation(args):
         result_file = VULTRIAL_DIR / "results" / "final_record" / f"{id_save}.txt"
         raw_output  = None
 
-        if result_file.exists():
+        if _ENABLE_RESULT_CACHE and result_file.exists():
             print(f"  [cached] {attack}")
             raw_output = result_file.read_text()
         else:
